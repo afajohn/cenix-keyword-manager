@@ -1914,3 +1914,324 @@ The main fix was explicitly typing the Promise as `Promise<NextResponse>` so Typ
 
 ---
 
+_**User (2026-01-16 10:04Z)**_
+
+Another issue found:
+18:11:07.899 Running build in Washington, D.C., USA (East) – iad1
+18:11:07.900 Build machine configuration: 2 cores, 8 GB
+18:11:08.097 Cloning github.com/afajohn/cenix-keyword-manager (Branch: main, Commit: df4197f)
+18:11:08.588 Cloning completed: 491.000ms
+18:11:10.371 Restored build cache from previous deployment (8igievnAVzjWnoBjFi3sE19yYC7S)
+18:11:10.695 Running "vercel build"
+18:11:11.785 Vercel CLI 50.4.3
+18:11:12.063 Installing dependencies...
+18:11:13.333 
+18:11:13.334 up to date in 1s
+18:11:13.335 
+18:11:13.335 147 packages are looking for funding
+18:11:13.335   run `npm fund` for details
+18:11:13.361 Detected Next.js version: 16.1.1
+18:11:13.365 Running "npm run build"
+18:11:13.462 
+18:11:13.463 > kwmaster@0.1.0 build
+18:11:13.463 > next build
+18:11:13.463 
+18:11:14.678 ▲ Next.js 16.1.1 (Turbopack)
+18:11:14.679 
+18:11:15.007   Creating an optimized production build ...
+18:11:22.931 ✓ Compiled successfully in 7.4s
+18:11:22.937   Running TypeScript ...
+18:11:26.891   Collecting page data using 1 worker ...
+18:11:27.329   Generating static pages using 1 worker (0/7) ...
+18:11:27.347   Generating static pages using 1 worker (1/7) 
+18:11:27.443 ⨯ useSearchParams() should be wrapped in a suspense boundary at page "/report". Read more: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+18:11:27.443     at Q (/vercel/path0/.next/server/chunks/ssr/node_modules_cf1f3d2c._.js:2:2111)
+18:11:27.443     at o (/vercel/path0/.next/server/chunks/ssr/node_modules_cf1f3d2c._.js:4:5284)
+18:11:27.444     at j (/vercel/path0/.next/server/chunks/ssr/_d3350cc7._.js:1:79596)
+18:11:27.444     at an (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:84360)
+18:11:27.444     at ai (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:86179)
+18:11:27.444     at al (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:107953)
+18:11:27.444     at as (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:105368)
+18:11:27.444     at aa (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:84712)
+18:11:27.444     at ai (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:86228)
+18:11:27.444     at ai (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:104708)
+18:11:27.445 Error occurred prerendering page "/report". Read more: https://nextjs.org/docs/messages/prerender-error
+18:11:27.445 Export encountered an error on /report/page: /report, exiting the build.
+18:11:27.457 ⨯ Next.js build worker exited with code: 1 and signal: null
+18:11:27.492 Error: Command "npm run build" exited with 1
+
+---
+
+_**Agent (model default, mode Agent)**_
+
+
+
+---
+
+
+Checking the report page for the Suspense boundary fix:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking the end of the file for the default export and Suspense wrapper:
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "export default|Suspense|ReportContent|ReportPage" in "app/report/page.tsx" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `app/report/page.tsx` | `export default function ReportPage() \{` | L90 |
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+The Suspense wrapper is missing. Adding it:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: app/report/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1,5 +1,5 @@
+  'use client';
+  
+- import { useState, useEffect, useMemo } from 'react';
++ import { useState, useEffect, useMemo, Suspense } from 'react';
+  import { useSearchParams } from 'next/navigation';
+  import Link from 'next/link';
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: app/report/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -88,5 +88,5 @@
+  
+  
+- export default function ReportPage() {
++ function ReportContent() {
+    const searchParams = useSearchParams();
+    const dataSourceParam = searchParams.get('dataSource');
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Adding the Suspense wrapper at the end of the file:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: app/report/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 14, lines removed: 1
+
+```diff
+@@ -955,4 +956,17 @@
+    );
+  }
+- }
++ 
++ export default function ReportPage() {
++   return (
++     &lt;Suspense fallback={
++       &lt;div className="min-h-screen bg-zinc-50 p-6"&gt;
++         &lt;div className="max-w-7xl mx-auto"&gt;
++           &lt;div className="text-center py-8 text-zinc-700"&gt;Loading report data...&lt;/div&gt;
++         &lt;/div&gt;
++       &lt;/div&gt;
++     }&gt;
++       &lt;ReportContent /&gt;
++     &lt;/Suspense&gt;
++   );
++ }
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `app/report/page.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: npx tsc --noEmit</summary>
+
+```bash
+npx tsc --noEmit
+```
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Verifying the fix is complete:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+## Fixed: Suspense boundary for `useSearchParams()`
+
+### Changes made to `app/report/page.tsx`:
+
+1. Added Suspense import (line 3):
+   - Added `Suspense` to the React imports
+
+2. Extracted component (line 90):
+   - Renamed `ReportPage` to `ReportContent` (contains `useSearchParams()` logic)
+
+3. Added Suspense wrapper (lines 959-971):
+   - Created new default export `ReportPage` that wraps `ReportContent` in `<Suspense>` with a loading fallback
+
+### Verification
+
+- TypeScript compilation: Passed (no errors)
+- Linting: No errors
+- Structure: Component properly wrapped in Suspense
+
+### What this fixes
+
+Next.js 15+ requires `useSearchParams()` to be wrapped in a Suspense boundary because it can cause the page to opt out of static generation. The error was:
+```
+⨯ useSearchParams() should be wrapped in a suspense boundary at page "/report"
+```
+
+## Ready to deploy
+
+The report page is now properly configured with the Suspense boundary. Commit and push these changes, then redeploy on Vercel. The build should succeed.
+
+The Suspense boundary allows the page to be statically generated while still supporting dynamic search params.
+
+---
+
