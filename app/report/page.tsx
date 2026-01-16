@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -87,7 +87,7 @@ const formatDateOnly = (value: string | undefined): string => {
 };
 
 
-export default function ReportPage() {
+function ReportContent() {
   const searchParams = useSearchParams();
   const dataSourceParam = searchParams.get('dataSource');
   const [selectedDataSource, setSelectedDataSource] = useState<string | null>(dataSourceParam);
@@ -953,5 +953,19 @@ export default function ReportPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ReportPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-zinc-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-8 text-zinc-700">Loading report data...</div>
+        </div>
+      </div>
+    }>
+      <ReportContent />
+    </Suspense>
   );
 }

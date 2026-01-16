@@ -1877,3 +1877,40 @@ Verifying the complete fix:
 
 ---
 
+
+All fixes are applied. Summary:
+
+## Fixed TypeScript errors
+
+### Changes made to `app/api/upload-csv/route.ts`:
+
+1. Line 29: Added explicit Promise type
+   - Changed: `new Promise((resolve) => {`
+   - To: `new Promise<NextResponse>((resolve) => {`
+
+2. Line 48: Fixed batch array type
+   - Changed: `const batch: Promise<void>[] = [];`
+   - To: `const batch: Promise<unknown>[] = [];`
+
+3. Lines 67-69: Fixed error handler in catch
+   - Added type annotation: `(error: any) => {`
+   - Added return: `return undefined;`
+
+4. Line 109: Fixed Papa.parse error callback type
+   - Changed: `error: (error) => {`
+   - To: `error: (error: Error) => {`
+
+### Verification
+
+- TypeScript compilation: Passed (no errors)
+- Linting: No errors
+- All type issues resolved
+
+## Ready to deploy
+
+The file now has the correct TypeScript types. Commit and push these changes, then redeploy on Vercel. The build should succeed.
+
+The main fix was explicitly typing the Promise as `Promise<NextResponse>` so TypeScript knows the route handler returns the correct type for Next.js.
+
+---
+
