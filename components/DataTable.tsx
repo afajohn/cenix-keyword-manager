@@ -44,6 +44,13 @@ const DataTable = ({ selectedDataSource, selectedWebsiteName }: DataTableProps) 
   const [selectedIntentsFilter, setSelectedIntentsFilter] = useState<string[]>([]);
   const [assignedToWebsiteFilter, setAssignedToWebsiteFilter] = useState<boolean>(false);
 
+  // Multi-website assignment modal state
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigningRecordId, setAssigningRecordId] = useState<string | null>(null);
+  const [availableWebsites, setAvailableWebsites] = useState<string[]>([]);
+  const [selectedWebsitesForAssign, setSelectedWebsitesForAssign] = useState<string[]>([]);
+  const [newWebsiteName, setNewWebsiteName] = useState('');
+
   const fetchRecords = async () => {
     try {
       setLoading(true);
@@ -65,6 +72,30 @@ const DataTable = ({ selectedDataSource, selectedWebsiteName }: DataTableProps) 
   useEffect(() => {
     fetchRecords();
   }, [selectedDataSource]);
+
+  // Fetch available websites for assignment
+  useEffect(() => {
+    const fetchWebsites = async () => {
+      try {
+        const response = await fetch('/api/records');
+        const data = await response.json();
+        if (data.success) {
+          const websiteSet = new Set<string>();
+          data.data.forEach((record: { websiteName?: string }) => {
+            if (record.websiteName && record.websiteName.trim()) {
+              // Handle comma-separated websites
+              const websites = record.websiteName.split(',').map((w: string) => w.trim()).filter((w: string) => w);
+              websites.forEach((w: string) => websiteSet.add(w));
+            }
+          });
+          setAvailableWebsites(Array.from(websiteSet).sort());
+        }
+      } catch (error) {
+        console.error('Failed to fetch websites:', error);
+      }
+    };
+    fetchWebsites();
+  }, [records]);
 
   // Initialize bulk edit data when rows are selected on website page
   useEffect(() => {
@@ -146,7 +177,12 @@ const DataTable = ({ selectedDataSource, selectedWebsiteName }: DataTableProps) 
       if (value === null || value === undefined || value === '') {
         return '-';
       }
-      return String(value);
+      const websites = String(value).split(',').map((w: string) => w.trim()).filter((w: string) => w);
+      if (websites.length === 0) {
+        return '-';
+      }
+      // Return comma-separated format for all websites
+      return websites.join(', ');
     }
 
     const value = record[fieldKey];
@@ -167,9 +203,13 @@ const DataTable = ({ selectedDataSource, selectedWebsiteName }: DataTableProps) 
     // Filter by website name
     if (selectedWebsiteName) {
       filtered = filtered.filter((record) => {
-        // Case-insensitive matching for website name
+        // Case-insensitive matching for website name (supports comma-separated)
         const recordWebsiteName = record.websiteName || record['Website Name'] || record['websiteName'];
-        return recordWebsiteName && String(recordWebsiteName).trim() === selectedWebsiteName.trim();
+        if (!recordWebsiteName || String(recordWebsiteName).trim() === '') {
+          return false;
+        }
+        const websites = String(recordWebsiteName).split(',').map((w: string) => w.trim());
+        return websites.some((w: string) => w === selectedWebsiteName.trim());
       });
     }
 
@@ -234,8 +274,9 @@ const DataTable = ({ selectedDataSource, selectedWebsiteName }: DataTableProps) 
         const websiteName = record.websiteName || record['Website Name'] || record['websiteName'];
         const websiteUrlPath = record.websiteUrlPath || record['Website URL Path'] || record['websiteUrlPath'];
         const url = record.url || record['URL'] || record['url'];
-        // Keyword is assigned if it has a website name, website URL path, or URL field
-        return (websiteName && String(websiteName).trim() !== '') ||
+        // Keyword is assigned if it has a website name (even if comma-separated), website URL path, or URL field
+        const hasWebsiteName = websiteName && String(websiteName).trim() !== '';
+        return hasWebsiteName ||
                (websiteUrlPath && String(websiteUrlPath).trim() !== '') ||
                (url && String(url).trim() !== '');
       });
@@ -623,6 +664,83 @@ const DataTable = ({ selectedDataSource, selectedWebsiteName }: DataTableProps) 
     }
   };
 
+  const handleIdea = (record: Record) => {
+    // TODO: Implement idea functionality
+    const keyword = getCellValue(record, 'Keyword');
+    console.log('Idea clicked for keyword:', keyword);
+    // Placeholder for idea functionality - can be customized based on requirements
+    alert(`Idea feature for keyword: ${keyword}\n\nThis functionality can be customized as needed.`);
+  };
+
+  const handleAssignClick = (record: Record) => {
+    setAssigningRecordId(record.id);
+    // Get current websites for this record
+    const currentWebsites = getWebsitesFromRecord(record);
+    setSelectedWebsitesForAssign(currentWebsites);
+    setNewWebsiteName('');
+    setShowAssignModal(true);
+  };
+
+  const getWebsitesFromRecord = (record: Record): string[] => {
+    const websiteName = record.websiteName || record['Website Name'] || record['websiteName'] || '';
+    if (!websiteName || String(websiteName).trim() === '') {
+      return [];
+    }
+    return String(websiteName).split(',').map((w: string) => w.trim()).filter((w: string) => w);
+  };
+
+  const handleAssignWebsites = async () => {
+    if (!assigningRecordId) return;
+
+    try {
+      const websitesToAssign = selectedWebsitesForAssign.length > 0 
+        ? selectedWebsitesForAssign.join(', ') 
+        : '';
+      
+      const response = await fetch(`/api/records/${assigningRecordId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ websiteName: websitesToAssign }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage({ 
+          type: 'success', 
+          text: `Successfully assigned keyword to ${selectedWebsitesForAssign.length} website(s).` 
+        });
+        setShowAssignModal(false);
+        setAssigningRecordId(null);
+        setSelectedWebsitesForAssign([]);
+        setNewWebsiteName('');
+        fetchRecords();
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to assign websites' });
+      }
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message || 'An error occurred' });
+    }
+  };
+
+  const handleToggleWebsiteSelection = (website: string) => {
+    setSelectedWebsitesForAssign((prev) => {
+      if (prev.includes(website)) {
+        return prev.filter((w) => w !== website);
+      }
+      return [...prev, website];
+    });
+  };
+
+  const handleAddNewWebsite = () => {
+    if (newWebsiteName.trim() && !selectedWebsitesForAssign.includes(newWebsiteName.trim())) {
+      setSelectedWebsitesForAssign((prev) => [...prev, newWebsiteName.trim()]);
+      setNewWebsiteName('');
+    }
+  };
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedDataSource, selectedWebsiteName]);
@@ -632,7 +750,12 @@ const DataTable = ({ selectedDataSource, selectedWebsiteName }: DataTableProps) 
     if (!selectedWebsiteName) return null;
     const record = records.find((r) => {
       const recordWebsiteName = r.websiteName || r['Website Name'] || r['websiteName'];
-      return recordWebsiteName && String(recordWebsiteName).trim() === selectedWebsiteName.trim();
+      if (!recordWebsiteName || String(recordWebsiteName).trim() === '') {
+        return false;
+      }
+      // Check if this record has the selected website (supports comma-separated)
+      const websites = String(recordWebsiteName).split(',').map((w: string) => w.trim());
+      return websites.some((w: string) => w === selectedWebsiteName.trim());
     });
     if (record) {
       return {
@@ -732,9 +855,10 @@ const DataTable = ({ selectedDataSource, selectedWebsiteName }: DataTableProps) 
         {websiteInfo && (
           <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-md">
             <div className="flex flex-col gap-2">
-              <h3 className="text-lg font-semibold text-zinc-900">
-                Website: {websiteInfo.name}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-zinc-900">Website:</h3>
+                <span className="text-lg font-semibold text-zinc-900">{websiteInfo.name}</span>
+              </div>
               {websiteInfo.urlPath && (
                 <p className="text-sm text-zinc-700">
                   URL Path: <span className="font-mono font-medium">{websiteInfo.urlPath}</span>
@@ -995,6 +1119,104 @@ const DataTable = ({ selectedDataSource, selectedWebsiteName }: DataTableProps) 
         </div>
       )}
 
+      {/* Assign Websites Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-zinc-900 mb-4">Assign to Websites</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-zinc-700 mb-2">
+                Select Websites:
+              </label>
+              <div className="border border-zinc-300 rounded-md p-3 max-h-48 overflow-y-auto">
+                {availableWebsites.length === 0 ? (
+                  <p className="text-sm text-zinc-500">No websites available. Add a new one below.</p>
+                ) : (
+                  availableWebsites.map((website) => (
+                    <label
+                      key={website}
+                      className="flex items-center gap-2 p-2 hover:bg-zinc-50 rounded cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedWebsitesForAssign.includes(website)}
+                        onChange={() => handleToggleWebsiteSelection(website)}
+                        className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                      />
+                      <span className="text-sm text-zinc-800">{website}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-zinc-700 mb-2">
+                Add New Website:
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newWebsiteName}
+                  onChange={(e) => setNewWebsiteName(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddNewWebsite();
+                    }
+                  }}
+                  placeholder="Enter website name"
+                  className="flex-1 px-3 py-2 border border-zinc-300 rounded-md bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-500"
+                />
+                <button
+                  onClick={handleAddNewWebsite}
+                  className="px-4 py-2 bg-zinc-600 text-white rounded-md hover:bg-zinc-700 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+
+            {selectedWebsitesForAssign.length > 0 && (
+              <div className="mb-4 p-3 bg-zinc-50 rounded-md">
+                <p className="text-sm font-medium text-zinc-700 mb-2">Selected Websites:</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedWebsitesForAssign.map((website) => (
+                    <span
+                      key={website}
+                      className="px-2 py-1 bg-white border border-zinc-300 rounded text-sm text-zinc-800"
+                    >
+                      {website}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setAssigningRecordId(null);
+                  setSelectedWebsitesForAssign([]);
+                  setNewWebsiteName('');
+                }}
+                className="px-4 py-2 border border-zinc-300 rounded-md bg-white text-zinc-700 hover:bg-zinc-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignWebsites}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              >
+                Assign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="overflow-x-auto mb-4">
         <table className="w-full border-collapse">
           <thead>
@@ -1118,6 +1340,20 @@ const DataTable = ({ selectedDataSource, selectedWebsiteName }: DataTableProps) 
                             className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                           >
                             Edit
+                          </button>
+                          {!selectedWebsiteName && (
+                            <button
+                              onClick={() => handleAssignClick(record)}
+                              className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                            >
+                              Assign
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleIdea(record)}
+                            className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+                          >
+                            Idea
                           </button>
                           {selectedWebsiteName && (
                             <button

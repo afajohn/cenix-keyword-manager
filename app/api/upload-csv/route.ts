@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // Read CSV file content (file itself is not stored, only the data)
     const text = await file.text();
 
-    return new Promise<NextResponse>((resolve) => {
+    return new Promise((resolve) => {
       Papa.parse(text, {
         header: true,
         skipEmptyLines: true,
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
             }
 
             // Store only the parsed data records in Firestore (not the CSV file)
-            const batch: Promise<unknown>[] = [];
+            const batch: Promise<void>[] = [];
 
             for (let i = 0; i < data.length; i++) {
               const row = data[i];
@@ -64,9 +64,8 @@ export async function POST(request: NextRequest) {
                     ...sanitizedRow,
                     dataSource: dataSource.trim(),
                     createdAt: new Date().toISOString(),
-                  }).catch((error: any) => {
+                  }).catch((error) => {
                     errors.push(`Row ${i + 1}: ${error.message}`);
-                    return undefined;
                   })
                 );
               }
@@ -106,7 +105,7 @@ export async function POST(request: NextRequest) {
             );
           }
         },
-        error: (error: Error) => {
+        error: (error) => {
           resolve(
             NextResponse.json(
               { error: `CSV parsing error: ${error.message}` },

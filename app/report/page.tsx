@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -14,22 +14,18 @@ interface Record {
   intent?: string;
   createdAt?: string;
   dataSource?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-interface KeywordHistory {
-  keyword: string;
-  entries: Array<{
-    timestamp: string;
-    kd: string | number;
-    sv: string | number;
-    intent: string;
-    dataSource?: string;
-  }>;
+interface MatrixCell {
+  kd: string | number;
+  sv: string | number;
+  intent: string;
+  dataSources: string[];
 }
 
 // Helper functions for extracting field values
-const getFieldValue = (record: Record, field: string): any => {
+const getFieldValue = (record: Record, field: string): unknown => {
   const fieldLower = field.toLowerCase();
   const keys = Object.keys(record);
   
@@ -53,7 +49,6 @@ const getFieldValue = (record: Record, field: string): any => {
 };
 
 const getKeywordName = (record: Record): string => {
-  // Try multiple field name variations (case-insensitive)
   const keyword = getFieldValue(record, 'keyword') || 
                   getFieldValue(record, 'Keyword') ||
                   record.keyword ||
@@ -63,39 +58,90 @@ const getKeywordName = (record: Record): string => {
 };
 
 const getKD = (record: Record): string | number => {
-  return getFieldValue(record, 'KD') || getFieldValue(record, 'kd') || '-';
+  const kd = getFieldValue(record, 'KD') || getFieldValue(record, 'kd');
+  if (kd === null || kd === undefined || kd === '') return '-';
+  return typeof kd === 'number' || typeof kd === 'string' ? kd : '-';
 };
 
 const getSV = (record: Record): string | number => {
-  return getFieldValue(record, 'SV') || getFieldValue(record, 'sv') || '-';
+  const sv = getFieldValue(record, 'SV') || getFieldValue(record, 'sv');
+  if (sv === null || sv === undefined || sv === '') return '-';
+  return typeof sv === 'number' || typeof sv === 'string' ? sv : '-';
 };
 
 const getIntent = (record: Record): string => {
   return String(getFieldValue(record, 'Intent') || getFieldValue(record, 'intent') || '-');
 };
 
-function ReportContent() {
+const formatDateOnly = (value: string | undefined): string => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const year = date.getFullYear();
+  
+  return `${month}-${day}-${year}`;
+};
+
+
+export default function ReportPage() {
   const searchParams = useSearchParams();
   const dataSourceParam = searchParams.get('dataSource');
   const [selectedDataSource, setSelectedDataSource] = useState<string | null>(dataSourceParam);
   
   const [records, setRecords] = useState<Record[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
-  const [selectedDate1, setSelectedDate1] = useState<string>('');
-  const [selectedDate2, setSelectedDate2] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({ key: 'keyword', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [keywordSearchQuery, setKeywordSearchQuery] = useState<string>('');
-  const [keywordSortConfig, setKeywordSortConfig] = useState<{ key: 'name' | 'entries'; direction: 'asc' | 'desc' } | null>({ key: 'entries', direction: 'desc' });
-  const [keywordCurrentPage, setKeywordCurrentPage] = useState(1);
-  const [keywordItemsPerPage, setKeywordItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+
+  // Filter input states (what the user is typing/selecting)
+  const [kdMinInput, setKdMinInput] = useState<string>('');
+  const [kdMaxInput, setKdMaxInput] = useState<string>('');
+  const [svMinInput, setSvMinInput] = useState<string>('');
+  const [svMaxInput, setSvMaxInput] = useState<string>('');
+  const [selectedIntentsInput, setSelectedIntentsInput] = useState<string[]>([]);
+  const [selectedDataSourceInput, setSelectedDataSourceInput] = useState<string>('all');
+  const [hasChangesInput, setHasChangesInput] = useState<boolean>(false);
+
+  // Applied filter states (take effect only when Apply Filters is clicked)
+  const [kdMinFilter, setKdMinFilter] = useState<string>('');
+  const [kdMaxFilter, setKdMaxFilter] = useState<string>('');
+  const [svMinFilter, setSvMinFilter] = useState<string>('');
+  const [svMaxFilter, setSvMaxFilter] = useState<string>('');
+  const [selectedIntentsFilter, setSelectedIntentsFilter] = useState<string[]>([]);
+  const [selectedDataSourceFilter, setSelectedDataSourceFilter] = useState<string>('all');
+  const [hasChangesFilter, setHasChangesFilter] = useState<boolean>(false);
+
+  const intentOptions = ['Navigational', 'Informational', 'Commercial', 'Transactional'];
+
+  // Get available data sources from records
+  const availableDataSources = useMemo(() => {
+    const sources = new Set<string>();
+    records.forEach((record) => {
+      if (record.dataSource && record.dataSource.trim() !== '') {
+        sources.add(record.dataSource);
+      }
+    });
+    return Array.from(sources).sort();
+  }, [records]);
 
   useEffect(() => {
     const dataSource = searchParams.get('dataSource');
     setSelectedDataSource(dataSource);
+    // If data source comes from URL, pre-select it in the filter
+    if (dataSource) {
+      setSelectedDataSourceInput(dataSource);
+      setSelectedDataSourceFilter(dataSource);
+    } else {
+      // If no URL param, default to 'all'
+      setSelectedDataSourceInput('all');
+      setSelectedDataSourceFilter('all');
+    }
   }, [searchParams]);
 
   useEffect(() => {
@@ -111,10 +157,6 @@ function ReportContent() {
       if (data.success) {
         setRecords(data.data);
         console.log('Fetched records:', data.data.length);
-        // Debug: log first record to see structure
-        if (data.data.length > 0) {
-          console.log('Sample record:', data.data[0]);
-        }
       } else {
         console.error('Failed to fetch records:', data.error);
       }
@@ -125,121 +167,227 @@ function ReportContent() {
     }
   };
 
-  // Group records by keyword and sort by timestamp
-  const keywordHistory = useMemo(() => {
-    const keywordMap = new Map<string, KeywordHistory>();
+  // Build matrix data structure: keyword -> date -> {kd, sv, intent, dataSources[]}
+  const matrixData = useMemo(() => {
+    const matrix = new Map<string, Map<string, MatrixCell>>();
+    const allDates = new Set<string>();
 
-    if (records.length === 0) {
-      console.log('No records found');
-      return [];
-    }
-
-    // Filter records by data source if selected
+    // Filter records by data source (from URL param or filter)
     let filteredRecords = records;
-    if (selectedDataSource) {
-      filteredRecords = records.filter((record) => record.dataSource === selectedDataSource);
+    
+    // If data source filter is applied, use that; otherwise check URL param
+    if (selectedDataSourceFilter && selectedDataSourceFilter !== 'all') {
+      filteredRecords = records.filter((record) => record.dataSource === selectedDataSourceFilter);
+    } else if (selectedDataSource && selectedDataSourceFilter === 'all') {
+      // If URL param exists but filter is set to 'all', still respect URL param initially
+      // This will be handled by the useEffect that syncs URL param to filter
     }
 
-    filteredRecords.forEach((record, index) => {
+    filteredRecords.forEach((record) => {
       const keyword = getKeywordName(record);
-      
-      // Debug first few records
-      if (index < 3) {
-        console.log(`Record ${index}:`, {
-          keyword,
-          allKeys: Object.keys(record),
-          recordSample: record,
-        });
-      }
       
       if (!keyword || keyword.trim() === '' || keyword === 'undefined' || keyword === 'null') {
         return;
       }
 
-      if (!keywordMap.has(keyword)) {
-        keywordMap.set(keyword, {
-          keyword,
-          entries: [],
+      const dateKey = formatDateOnly(record.createdAt);
+      if (!dateKey) return;
+
+      allDates.add(dateKey);
+
+      if (!matrix.has(keyword)) {
+        matrix.set(keyword, new Map());
+      }
+
+      const keywordMap = matrix.get(keyword)!;
+      
+      if (!keywordMap.has(dateKey)) {
+        keywordMap.set(dateKey, {
+          kd: getKD(record),
+          sv: getSV(record),
+          intent: getIntent(record),
+          dataSources: [],
         });
       }
 
-      const history = keywordMap.get(keyword)!;
-      const timestamp = record.createdAt || '';
+      const cell = keywordMap.get(dateKey)!;
+      const dataSource = record.dataSource || '';
       
-      history.entries.push({
-        timestamp,
-        kd: getKD(record),
-        sv: getSV(record),
-        intent: getIntent(record),
-        dataSource: record.dataSource,
-      });
+      // Aggregate data sources (comma-separated)
+      if (dataSource && !cell.dataSources.includes(dataSource)) {
+        cell.dataSources.push(dataSource);
+      }
+
+      // If multiple entries exist for same keyword+date, use the values from the last processed record
+      // This will use the most recent entry's KD, SV, and Intent while aggregating all data sources
+      cell.kd = getKD(record);
+      cell.sv = getSV(record);
+      cell.intent = getIntent(record);
     });
 
-    console.log(`Total keywords found: ${keywordMap.size} (filtered by data source: ${selectedDataSource || 'All'})`);
-
-    // Sort entries by timestamp (oldest first)
-    keywordMap.forEach((history) => {
-      history.entries.sort((a, b) => {
-        const dateA = new Date(a.timestamp).getTime();
-        const dateB = new Date(b.timestamp).getTime();
-        return dateA - dateB;
-      });
+    // Sort dates in descending order (newest first)
+    const sortedDates = Array.from(allDates).sort((a, b) => {
+      const dateA = new Date(a.split('-').join('/')).getTime();
+      const dateB = new Date(b.split('-').join('/')).getTime();
+      return dateB - dateA; // Descending
     });
 
-    // Convert to array (will be sorted by UI controls)
-    return Array.from(keywordMap.values());
-  }, [records, selectedDataSource]);
+    return { matrix, dates: sortedDates };
+  }, [records, selectedDataSource, selectedDataSourceFilter]);
 
-  // Filter, sort, and paginate keywords
-  const filteredSortedKeywords = useMemo(() => {
-    let filtered = keywordHistory;
+  // Get all keywords and filter/search/sort them
+  const processedKeywords = useMemo(() => {
+    let keywords = Array.from(matrixData.matrix.keys());
 
     // Apply search filter
-    if (keywordSearchQuery.trim()) {
-      const query = keywordSearchQuery.toLowerCase();
-      filtered = filtered.filter((history) =>
-        history.keyword.toLowerCase().includes(query)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      keywords = keywords.filter((keyword) =>
+        keyword.toLowerCase().includes(query)
       );
     }
 
-    // Apply sorting
-    if (keywordSortConfig) {
-      filtered = [...filtered].sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
+    // Apply KD numeric range filter
+    if (kdMinFilter.trim() || kdMaxFilter.trim()) {
+      const min = kdMinFilter.trim() ? Number(kdMinFilter) : Number.NEGATIVE_INFINITY;
+      const max = kdMaxFilter.trim() ? Number(kdMaxFilter) : Number.POSITIVE_INFINITY;
+      keywords = keywords.filter((keyword) => {
+        const keywordMap = matrixData.matrix.get(keyword);
+        if (!keywordMap) return false;
+        // Check if any date entry matches the KD range
+        return Array.from(keywordMap.values()).some((cell) => {
+          const kdValue = Number(cell.kd);
+          if (Number.isNaN(kdValue)) return false;
+          return kdValue >= min && kdValue <= max;
+        });
+      });
+    }
 
-        if (keywordSortConfig.key === 'entries') {
-          aValue = a.entries.length;
-          bValue = b.entries.length;
+    // Apply SV numeric range filter
+    if (svMinFilter.trim() || svMaxFilter.trim()) {
+      const min = svMinFilter.trim() ? Number(svMinFilter) : Number.NEGATIVE_INFINITY;
+      const max = svMaxFilter.trim() ? Number(svMaxFilter) : Number.POSITIVE_INFINITY;
+      keywords = keywords.filter((keyword) => {
+        const keywordMap = matrixData.matrix.get(keyword);
+        if (!keywordMap) return false;
+        // Check if any date entry matches the SV range
+        return Array.from(keywordMap.values()).some((cell) => {
+          const svValue = Number(cell.sv);
+          if (Number.isNaN(svValue)) return false;
+          return svValue >= min && svValue <= max;
+        });
+      });
+    }
+
+    // Filter by selected intents (using contains matching)
+    if (selectedIntentsFilter.length > 0) {
+      keywords = keywords.filter((keyword) => {
+        const keywordMap = matrixData.matrix.get(keyword);
+        if (!keywordMap) return false;
+        // Check if any date entry matches the intent filter
+        return Array.from(keywordMap.values()).some((cell) => {
+          const intentValue = String(cell.intent).toLowerCase();
+          if (intentValue === '' || intentValue === '-') return false;
+          // Check if any of the selected intents are contained in the cell's intent value
+          return selectedIntentsFilter.some((selectedIntent) =>
+            intentValue.includes(selectedIntent.toLowerCase()),
+          );
+        });
+      });
+    }
+
+    // Filter by keywords that have changes in KD or SV
+    if (hasChangesFilter) {
+      keywords = keywords.filter((keyword) => {
+        const keywordMap = matrixData.matrix.get(keyword);
+        if (!keywordMap) return false;
+        
+        const cells = Array.from(keywordMap.values());
+        if (cells.length < 2) return false; // Need at least 2 entries to have changes
+
+        // Check for KD changes
+        const kdValues = cells.map((cell) => Number(cell.kd)).filter((kd) => !Number.isNaN(kd));
+        const hasKdChanges = kdValues.length >= 2 && new Set(kdValues).size > 1;
+
+        // Check for SV changes
+        const svValues = cells.map((cell) => Number(cell.sv)).filter((sv) => !Number.isNaN(sv));
+        const hasSvChanges = svValues.length >= 2 && new Set(svValues).size > 1;
+
+        // Return true if there are changes in KD or SV
+        return hasKdChanges || hasSvChanges;
+      });
+    }
+
+    // Apply sorting
+    if (sortConfig) {
+      keywords = [...keywords].sort((a, b) => {
+        let aValue: string | number | undefined;
+        let bValue: string | number | undefined;
+
+        if (sortConfig.key === 'keyword') {
+          aValue = a.toLowerCase();
+          bValue = b.toLowerCase();
+        } else if (sortConfig.key === 'entries') {
+          // Sort by number of dates (entries)
+          aValue = matrixData.matrix.get(a)?.size || 0;
+          bValue = matrixData.matrix.get(b)?.size || 0;
         } else {
-          // Sort by name
-          aValue = a.keyword.toLowerCase();
-          bValue = b.keyword.toLowerCase();
+          // Sort by date+metric combination (e.g., "2024-01-01||kd", "2024-01-01||sv")
+          const parts = sortConfig.key.split('||');
+          if (parts.length !== 2) return 0;
+          const [date, metric] = parts;
+          const aCell = matrixData.matrix.get(a)?.get(date);
+          const bCell = matrixData.matrix.get(b)?.get(date);
+
+          if (!aCell && !bCell) return 0;
+          if (!aCell) return 1; // Put nulls at end
+          if (!bCell) return -1; // Put nulls at end
+
+          switch (metric) {
+            case 'kd':
+              aValue = Number(aCell.kd) || 0;
+              bValue = Number(bCell.kd) || 0;
+              break;
+            case 'sv':
+              aValue = Number(aCell.sv) || 0;
+              bValue = Number(bCell.sv) || 0;
+              break;
+            case 'intent':
+              aValue = String(aCell.intent).toLowerCase();
+              bValue = String(bCell.intent).toLowerCase();
+              break;
+            case 'source':
+              aValue = aCell.dataSources.join(', ').toLowerCase();
+              bValue = bCell.dataSources.join(', ').toLowerCase();
+              break;
+            default:
+              return 0;
+          }
         }
 
-        if (aValue < bValue) return keywordSortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return keywordSortConfig.direction === 'asc' ? 1 : -1;
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
       });
     } else {
-      // Default: sort by entries descending (highest first)
-      filtered = [...filtered].sort((a, b) => b.entries.length - a.entries.length);
+      // Default: sort by keyword ascending
+      keywords = [...keywords].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     }
 
-    return filtered;
-  }, [keywordHistory, keywordSearchQuery, keywordSortConfig]);
+    return keywords;
+  }, [matrixData, searchQuery, sortConfig, kdMinFilter, kdMaxFilter, svMinFilter, svMaxFilter, selectedIntentsFilter, hasChangesFilter]);
 
   // Paginate keywords
   const paginatedKeywords = useMemo(() => {
-    const startIndex = (keywordCurrentPage - 1) * keywordItemsPerPage;
-    const endIndex = startIndex + keywordItemsPerPage;
-    return filteredSortedKeywords.slice(startIndex, endIndex);
-  }, [filteredSortedKeywords, keywordCurrentPage, keywordItemsPerPage]);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return processedKeywords.slice(startIndex, endIndex);
+  }, [processedKeywords, currentPage, itemsPerPage]);
 
-  const keywordTotalPages = Math.ceil(filteredSortedKeywords.length / keywordItemsPerPage);
+  const totalPages = Math.ceil(processedKeywords.length / itemsPerPage);
 
-  const handleKeywordSort = (key: 'name' | 'entries') => {
-    setKeywordSortConfig((prev) => {
+  const handleSort = (key: string) => {
+    setSortConfig((prev) => {
       if (prev?.key === key) {
         return prev.direction === 'asc'
           ? { key, direction: 'desc' }
@@ -247,59 +395,97 @@ function ReportContent() {
       }
       return { key, direction: 'asc' };
     });
-    setKeywordCurrentPage(1);
+    setCurrentPage(1);
+  };
+
+  const getSortIcon = (columnKey: string) => {
+    if (sortConfig?.key !== columnKey) {
+      return (
+        <span className="ml-1 text-zinc-400">
+          <svg className="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+          </svg>
+        </span>
+      );
+    }
+    return sortConfig.direction === 'asc' ? (
+      <span className="ml-1 text-zinc-900">
+        <svg className="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        </svg>
+      </span>
+    ) : (
+      <span className="ml-1 text-zinc-900">
+        <svg className="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </span>
+    );
   };
 
   const handleExportToCSV = () => {
-    // Prepare data: if keyword is selected, export only that keyword; otherwise export all
     const exportData: Array<{
       Keyword: string;
-      Timestamp: string;
+      Date: string;
       KD: string | number;
       SV: string | number;
       Intent: string;
-      'Present In': string;
+      'Data Sources': string;
     }> = [];
 
-    // Determine which keywords to export
-    const keywordsToExport = selectedKeyword
-      ? keywordHistory.filter((h) => h.keyword === selectedKeyword)
-      : keywordHistory;
+    // Determine which data sources to include in export
+    const dataSourcesToExport = selectedDataSourceFilter && selectedDataSourceFilter !== 'all'
+      ? [selectedDataSourceFilter]
+      : null;
 
-    // Process each keyword
-    keywordsToExport.forEach((history) => {
-      // Sort entries by timestamp descending (newest first)
-      const sortedEntries = [...history.entries].sort((a, b) => {
-        const dateA = new Date(a.timestamp).getTime();
-        const dateB = new Date(b.timestamp).getTime();
-        return dateB - dateA; // Descending order
+    processedKeywords.forEach((keyword) => {
+      const keywordMap = matrixData.matrix.get(keyword);
+      if (!keywordMap) return;
+
+      // Sort dates descending
+      const dates = Array.from(keywordMap.keys()).sort((a, b) => {
+        const dateA = new Date(a.split('-').join('/')).getTime();
+        const dateB = new Date(b.split('-').join('/')).getTime();
+        return dateB - dateA;
       });
 
-      // Add each entry for this keyword
-      sortedEntries.forEach((entry) => {
+      dates.forEach((date) => {
+        const cell = keywordMap.get(date);
+        if (!cell) return;
+
+        // Filter data sources if a filter is applied
+        let dataSourcesToInclude = cell.dataSources;
+        if (dataSourcesToExport) {
+          dataSourcesToInclude = cell.dataSources.filter((ds) => 
+            dataSourcesToExport.includes(ds)
+          );
+          // Skip this entry if no data sources match after filtering
+          if (dataSourcesToInclude.length === 0) return;
+        }
+
         exportData.push({
-          Keyword: history.keyword,
-          Timestamp: formatDateTime(entry.timestamp),
-          KD: entry.kd,
-          SV: entry.sv,
-          Intent: entry.intent,
-          'Present In': entry.dataSource || '-',
+          Keyword: keyword,
+          Date: date,
+          KD: cell.kd,
+          SV: cell.sv,
+          Intent: cell.intent,
+          'Data Sources': dataSourcesToInclude.join(', ') || '-',
         });
       });
     });
 
     // Convert to CSV format
-    const headers = ['Keyword', 'Timestamp', 'KD', 'SV', 'Intent', 'Present In'];
+    const headers = ['Keyword', 'Date', 'KD', 'SV', 'Intent', 'Data Sources'];
     const csvRows = [
       headers.join(','),
       ...exportData.map((row) =>
         [
           `"${String(row.Keyword).replace(/"/g, '""')}"`,
-          `"${String(row.Timestamp).replace(/"/g, '""')}"`,
+          `"${String(row.Date).replace(/"/g, '""')}"`,
           String(row.KD),
           String(row.SV),
           `"${String(row.Intent).replace(/"/g, '""')}"`,
-          `"${String(row['Present In']).replace(/"/g, '""')}"`,
+          `"${String(row['Data Sources']).replace(/"/g, '""')}"`,
         ].join(',')
       ),
     ];
@@ -312,9 +498,7 @@ function ReportContent() {
     const url = URL.createObjectURL(blob);
     
     link.setAttribute('href', url);
-    const filename = selectedKeyword
-      ? `keyword-report-${selectedKeyword.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${new Date().toISOString().split('T')[0]}.csv`
-      : `keyword-report-all-${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `keyword-report-matrix-${new Date().toISOString().split('T')[0]}.csv`;
     link.setAttribute('download', filename);
     link.style.visibility = 'hidden';
     
@@ -326,187 +510,10 @@ function ReportContent() {
     URL.revokeObjectURL(url);
   };
 
-  const formatDateTime = (value: string | undefined): string => {
-    if (!value) return '-';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    
-    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-    const month = pad(date.getMonth() + 1);
-    const day = pad(date.getDate());
-    const year = date.getFullYear();
-    
-    let hours = date.getHours();
-    const minutes = pad(date.getMinutes());
-    const seconds = pad(date.getSeconds());
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    if (hours === 0) hours = 12;
-    const hoursStr = pad(hours);
-    
-    return `${month}-${day}-${year} ${hoursStr}:${minutes}:${seconds} ${ampm}`;
-  };
-
-  const selectedKeywordData = useMemo(() => {
-    if (!selectedKeyword) return null;
-    return keywordHistory.find((h) => h.keyword === selectedKeyword) || null;
-  }, [selectedKeyword, keywordHistory]);
-
-  // Get comparison data based on selected dates
-  const comparisonData = useMemo(() => {
-    if (!selectedKeywordData || !selectedDate1 || !selectedDate2) return null;
-
-    // Find entries by matching the formatted timestamp
-    const formatDateTimeForComparison = (value: string | undefined): string => {
-      if (!value) return '';
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return '';
-      
-      const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-      const month = pad(date.getMonth() + 1);
-      const day = pad(date.getDate());
-      const year = date.getFullYear();
-      
-      let hours = date.getHours();
-      const minutes = pad(date.getMinutes());
-      const seconds = pad(date.getSeconds());
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      if (hours === 0) hours = 12;
-      const hoursStr = pad(hours);
-      
-      return `${month}-${day}-${year} ${hoursStr}:${minutes}:${seconds} ${ampm}`;
-    };
-
-    const entry1 = selectedKeywordData.entries.find((e) => {
-      const entryDate = formatDateTimeForComparison(e.timestamp);
-      return entryDate === selectedDate1;
-    });
-    
-    const entry2 = selectedKeywordData.entries.find((e) => {
-      const entryDate = formatDateTimeForComparison(e.timestamp);
-      return entryDate === selectedDate2;
-    });
-
-    return { entry1, entry2 };
-  }, [selectedKeywordData, selectedDate1, selectedDate2]);
-
-  // Filter and sort history entries
-  const filteredAndSortedEntries = useMemo(() => {
-    if (!selectedKeywordData) return [];
-
-    let filtered = selectedKeywordData.entries;
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((entry) => {
-        return (
-          String(entry.kd).toLowerCase().includes(query) ||
-          String(entry.sv).toLowerCase().includes(query) ||
-          String(entry.intent).toLowerCase().includes(query) ||
-          (entry.dataSource && entry.dataSource.toLowerCase().includes(query)) ||
-          formatDateTime(entry.timestamp).toLowerCase().includes(query)
-        );
-      });
-    }
-
-    // Apply sorting
-    if (sortConfig) {
-      filtered = [...filtered].sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
-
-        switch (sortConfig.key) {
-          case 'timestamp':
-            aValue = new Date(a.timestamp).getTime();
-            bValue = new Date(b.timestamp).getTime();
-            break;
-          case 'kd':
-            aValue = Number(a.kd) || 0;
-            bValue = Number(b.kd) || 0;
-            break;
-          case 'sv':
-            aValue = Number(a.sv) || 0;
-            bValue = Number(b.sv) || 0;
-            break;
-          case 'intent':
-            aValue = String(a.intent).toLowerCase();
-            bValue = String(b.intent).toLowerCase();
-            break;
-          case 'dataSource':
-            aValue = String(a.dataSource || '').toLowerCase();
-            bValue = String(b.dataSource || '').toLowerCase();
-            break;
-          default:
-            return 0;
-        }
-
-        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    } else {
-      // Default: sort by timestamp descending (newest first)
-      filtered = [...filtered].sort((a, b) => {
-        const dateA = new Date(a.timestamp).getTime();
-        const dateB = new Date(b.timestamp).getTime();
-        return dateB - dateA; // Descending order
-      });
-    }
-
-    return filtered;
-  }, [selectedKeywordData, searchQuery, sortConfig]);
-
-  // Paginate entries
-  const paginatedEntries = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredAndSortedEntries.slice(startIndex, endIndex);
-  }, [filteredAndSortedEntries, currentPage, itemsPerPage]);
-
-  const totalPages = Math.ceil(filteredAndSortedEntries.length / itemsPerPage);
-
-  const handleSort = (key: string) => {
-    setSortConfig((prev) => {
-      if (prev?.key === key) {
-        return prev.direction === 'asc'
-          ? { key, direction: 'desc' }
-          : null;
-      }
-      return { key, direction: 'asc' };
-    });
-  };
-
-  const getSortIcon = (column: string) => {
-    if (sortConfig?.key !== column) {
-      return (
-        <span className="ml-1 text-zinc-400">
-          <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-          </svg>
-        </span>
-      );
-    }
-    return sortConfig.direction === 'asc' ? (
-      <span className="ml-1 text-zinc-900">
-        <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-        </svg>
-      </span>
-    ) : (
-      <span className="ml-1 text-zinc-900">
-        <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </span>
-    );
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-50 p-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="w-full">
           <div className="text-center py-8 text-zinc-700">Loading report data...</div>
         </div>
       </div>
@@ -516,437 +523,435 @@ function ReportContent() {
   return (
     <div className="min-h-screen bg-zinc-50 p-6">
       <div className="w-full">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-zinc-900">Keyword Change Report</h1>
-            <p className="text-zinc-600 mt-1">
-              Track changes in KD, SV, and Intent over time
-              {selectedDataSource && (
-                <span className="ml-2 text-sm font-medium">
-                  (Data Source: {selectedDataSource})
-                </span>
-              )}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleExportToCSV}
-              className="px-4 py-2 bg-green-600 text-white rounded-md font-medium
-                hover:bg-green-700 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Export to CSV
-            </button>
+        <div className="mb-6">
+          <div className="flex items-center gap-4 mb-4">
             <Link
               href="/"
-              className="px-4 py-2 bg-zinc-600 text-white rounded-md font-medium
-                hover:bg-zinc-700 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 bg-zinc-600 text-white rounded-md font-medium
+                hover:bg-zinc-700 transition-colors text-sm"
             >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
               Back to Records
             </Link>
           </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-zinc-900">Keyword Change Report</h1>
+              <p className="text-zinc-600 mt-1">
+                Matrix view: Keywords vs Dates with KD, SV, Intent, and Data Sources
+                {selectedDataSource && (
+                  <span className="ml-2 text-sm font-medium">
+                    (Data Source: {selectedDataSource})
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleExportToCSV}
+                className="px-4 py-2 bg-green-600 text-white rounded-md font-medium
+                  hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export to CSV
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left Panel - Keyword List */}
-          <div className="lg:col-span-1 bg-white rounded-lg border border-zinc-200 shadow-sm p-4 flex flex-col">
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xl font-semibold text-zinc-900">
-                  Keywords ({filteredSortedKeywords.length})
-                </h2>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => handleKeywordSort('entries')}
-                    className="px-2 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 hover:bg-zinc-50"
-                    title="Sort by entries"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => handleKeywordSort('name')}
-                    className="px-2 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 hover:bg-zinc-50"
-                    title="Sort by name"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+        {/* Search and Filters */}
+        <div className="mb-4 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex-1 max-w-md">
               <input
                 type="text"
                 placeholder="Search keywords..."
-                value={keywordSearchQuery}
+                value={searchQuery}
                 onChange={(e) => {
-                  setKeywordSearchQuery(e.target.value);
-                  setKeywordCurrentPage(1);
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
                 }}
-                className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-md
+                className="w-full px-3 py-2 border border-zinc-300 rounded-md
                   bg-white text-zinc-900
                   focus:outline-none focus:ring-2 focus:ring-zinc-500"
               />
             </div>
-            <div className="flex-1 space-y-2 overflow-y-auto min-h-0">
-              {paginatedKeywords.length === 0 ? (
-                <div className="text-center py-8 text-zinc-500 text-sm">
-                  {keywordSearchQuery ? 'No keywords found' : 'No keywords available'}
-                </div>
-              ) : (
-                paginatedKeywords.map((history) => (
-                  <button
-                    key={history.keyword}
-                    onClick={() => setSelectedKeyword(history.keyword)}
-                    className={`w-full text-left p-3 rounded-md border transition-colors ${
-                      selectedKeyword === history.keyword
-                        ? 'bg-blue-50 border-blue-300 text-blue-900'
-                        : 'bg-white border-zinc-200 hover:bg-zinc-50 text-zinc-900'
-                    }`}
-                  >
-                    <div className="font-medium">{history.keyword}</div>
-                    <div className="text-xs text-zinc-500 mt-1">
-                      {history.entries.length} {history.entries.length === 1 ? 'entry' : 'entries'}
-                    </div>
-                  </button>
-                ))
-              )}
+            <div className="flex items-center gap-2 text-sm text-zinc-600">
+              <span>
+                Showing {paginatedKeywords.length} of {processedKeywords.length} keywords
+              </span>
+              <span>•</span>
+              <span>
+                {matrixData.dates.length} date{matrixData.dates.length !== 1 ? 's' : ''}
+              </span>
             </div>
-            {/* Pagination for Keywords */}
-            {keywordTotalPages > 1 && (
-              <div className="mt-4 pt-4 border-t border-zinc-200">
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs text-zinc-600">
-                    <span>
-                      Page {keywordCurrentPage} of {keywordTotalPages}
-                    </span>
-                    <select
-                      value={keywordItemsPerPage}
-                      onChange={(e) => {
-                        setKeywordItemsPerPage(Number(e.target.value));
-                        setKeywordCurrentPage(1);
-                      }}
-                      className="px-2 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setKeywordCurrentPage((prev) => Math.max(1, prev - 1))}
-                      disabled={keywordCurrentPage === 1}
-                      className="flex-1 px-2 py-1 text-xs border border-zinc-300 rounded-md bg-white text-zinc-900
-                        hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed
-                        transition-colors"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => setKeywordCurrentPage((prev) => Math.min(keywordTotalPages, prev + 1))}
-                      disabled={keywordCurrentPage === keywordTotalPages}
-                      className="flex-1 px-2 py-1 text-xs border border-zinc-300 rounded-md bg-white text-zinc-900
-                        hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed
-                        transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Right Panel - Keyword Details and Comparison */}
-          <div className="lg:col-span-3 bg-white rounded-lg border border-zinc-200 shadow-sm p-6">
-            {selectedKeywordData ? (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-semibold text-zinc-900 mb-2">
-                    {selectedKeywordData.keyword}
-                  </h2>
-                  <p className="text-zinc-600">
-                    {selectedKeywordData.entries.length} historical entry
-                    {selectedKeywordData.entries.length !== 1 ? 'ies' : 'y'}
-                  </p>
-                </div>
+          {/* Custom Filters */}
+          <div className="flex flex-col gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs sm:text-sm">
+            <div className="flex flex-wrap gap-3 items-center">
+              <span className="font-medium text-zinc-800"> <strong>Filters:</strong> </span>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-700 font-medium">Data Source</span>
+                <select
+                  value={selectedDataSourceInput}
+                  onChange={(e) => setSelectedDataSourceInput(e.target.value)}
+                  className="min-w-[200px] px-2 py-1 border border-zinc-300 rounded-md bg-white text-zinc-900 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
+                >
+                  <option value="all">All Data Sources</option>
+                  {availableDataSources.map((source) => (
+                    <option key={source} value={source} className="text-xs sm:text-sm">
+                      {source}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                {/* Date Selection for Comparison */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-zinc-50 rounded-md">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-2">
-                      Select First Date
-                    </label>
-                    <select
-                      value={selectedDate1}
-                      onChange={(e) => setSelectedDate1(e.target.value)}
-                      className="w-full px-3 py-2 border border-zinc-300 rounded-md bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                    >
-                      <option value="">Select date...</option>
-                      {selectedKeywordData.entries.map((entry, idx) => (
-                        <option key={idx} value={formatDateTime(entry.timestamp)}>
-                          {formatDateTime(entry.timestamp)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-2">
-                      Select Second Date (for comparison)
-                    </label>
-                    <select
-                      value={selectedDate2}
-                      onChange={(e) => setSelectedDate2(e.target.value)}
-                      className="w-full px-3 py-2 border border-zinc-300 rounded-md bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                    >
-                      <option value="">Select date...</option>
-                      {selectedKeywordData.entries.map((entry, idx) => (
-                        <option key={idx} value={formatDateTime(entry.timestamp)}>
-                          {formatDateTime(entry.timestamp)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
 
-                {/* Comparison View */}
-                {comparisonData && comparisonData.entry1 && comparisonData.entry2 && (
-                  <div className="border border-zinc-200 rounded-md p-4">
-                    <h3 className="text-lg font-semibold text-zinc-900 mb-4">Comparison</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-3 bg-blue-50 rounded-md">
-                        <div className="text-sm font-medium text-zinc-700 mb-2">
-                          {formatDateTime(comparisonData.entry1.timestamp)}
-                        </div>
-                        <div className="space-y-2">
-                          <div>
-                            <span className="text-xs text-zinc-600">KD:</span>{' '}
-                            <span className="font-semibold">{comparisonData.entry1.kd}</span>
-                          </div>
-                          <div>
-                            <span className="text-xs text-zinc-600">SV:</span>{' '}
-                            <span className="font-semibold">{comparisonData.entry1.sv}</span>
-                          </div>
-                          <div>
-                            <span className="text-xs text-zinc-600">Intent:</span>{' '}
-                            <span className="font-semibold">{comparisonData.entry1.intent}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="p-3 bg-green-50 rounded-md">
-                        <div className="text-sm font-medium text-zinc-700 mb-2">
-                          {formatDateTime(comparisonData.entry2.timestamp)}
-                        </div>
-                        <div className="space-y-2">
-                          <div>
-                            <span className="text-xs text-zinc-600">KD:</span>{' '}
-                            <span className="font-semibold">{comparisonData.entry2.kd}</span>
-                            {comparisonData.entry1.kd !== comparisonData.entry2.kd && (
-                              <span className="ml-2 text-xs text-orange-600">(changed)</span>
-                            )}
-                          </div>
-                          <div>
-                            <span className="text-xs text-zinc-600">SV:</span>{' '}
-                            <span className="font-semibold">{comparisonData.entry2.sv}</span>
-                            {comparisonData.entry1.sv !== comparisonData.entry2.sv && (
-                              <span className="ml-2 text-xs text-orange-600">(changed)</span>
-                            )}
-                          </div>
-                          <div>
-                            <span className="text-xs text-zinc-600">Intent:</span>{' '}
-                            <span className="font-semibold">{comparisonData.entry2.intent}</span>
-                            {comparisonData.entry1.intent !== comparisonData.entry2.intent && (
-                              <span className="ml-2 text-xs text-orange-600">(changed)</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <div className="flex items-center gap-1">
+                <span className="text-zinc-700 font-medium">KD</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="Min"
+                  value={kdMinInput}
+                  onChange={(e) => setKdMinInput(e.target.value)}
+                  className="w-16 px-2 py-1 border border-zinc-300 rounded-md bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                />
+                <span className="text-zinc-500">–</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="Max"
+                  value={kdMaxInput}
+                  onChange={(e) => setKdMaxInput(e.target.value)}
+                  className="w-16 px-2 py-1 border border-zinc-300 rounded-md bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                />
+              </div>
 
-                {/* Full History Table */}
-                <div>
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                    <h3 className="text-lg font-semibold text-zinc-900">
-                      Full History ({filteredAndSortedEntries.length} entries)
-                    </h3>
-                    <div className="flex gap-2 w-full sm:w-auto">
-                      <input
-                        type="text"
-                        placeholder="Search history..."
-                        value={searchQuery}
-                        onChange={(e) => {
-                          setSearchQuery(e.target.value);
-                          setCurrentPage(1);
-                        }}
-                        className="flex-1 sm:w-64 px-3 py-2 border border-zinc-300 rounded-md
-                          bg-white text-zinc-900
-                          focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                      />
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="border-b border-zinc-200 bg-zinc-50">
-                          <th
-                            onClick={() => handleSort('timestamp')}
-                            className="px-4 py-3 text-left text-sm font-semibold text-zinc-800
-                              cursor-pointer hover:bg-zinc-100 select-none"
-                          >
-                            <div className="flex items-center">
-                              Timestamp
-                              {getSortIcon('timestamp')}
-                            </div>
-                          </th>
-                          <th
-                            onClick={() => handleSort('kd')}
-                            className="px-4 py-3 text-left text-sm font-semibold text-zinc-800
-                              cursor-pointer hover:bg-zinc-100 select-none"
-                          >
-                            <div className="flex items-center">
-                              KD
-                              {getSortIcon('kd')}
-                            </div>
-                          </th>
-                          <th
-                            onClick={() => handleSort('sv')}
-                            className="px-4 py-3 text-left text-sm font-semibold text-zinc-800
-                              cursor-pointer hover:bg-zinc-100 select-none"
-                          >
-                            <div className="flex items-center">
-                              SV
-                              {getSortIcon('sv')}
-                            </div>
-                          </th>
-                          <th
-                            onClick={() => handleSort('intent')}
-                            className="px-4 py-3 text-left text-sm font-semibold text-zinc-800
-                              cursor-pointer hover:bg-zinc-100 select-none"
-                          >
-                            <div className="flex items-center">
-                              Intent
-                              {getSortIcon('intent')}
-                            </div>
-                          </th>
-                          <th
-                            onClick={() => handleSort('dataSource')}
-                            className="px-4 py-3 text-left text-sm font-semibold text-zinc-800
-                              cursor-pointer hover:bg-zinc-100 select-none"
-                          >
-                            <div className="flex items-center">
-                              Present In
-                              {getSortIcon('dataSource')}
-                            </div>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedEntries.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={5}
-                              className="px-4 py-8 text-center text-zinc-700"
-                            >
-                              {searchQuery ? 'No entries found matching your search' : 'No entries available'}
-                            </td>
-                          </tr>
-                        ) : (
-                          paginatedEntries.map((entry, idx) => (
-                            <tr
-                              key={idx}
-                              className="border-b border-zinc-100 hover:bg-zinc-50"
-                            >
-                              <td className="px-4 py-3 text-sm text-zinc-900">
-                                {formatDateTime(entry.timestamp)}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-zinc-900">{entry.kd}</td>
-                              <td className="px-4 py-3 text-sm text-zinc-900">{entry.sv}</td>
-                              <td className="px-4 py-3 text-sm text-zinc-900">{entry.intent}</td>
-                              <td className="px-4 py-3 text-sm text-zinc-600">
-                                {entry.dataSource || '-'}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                  
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4">
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-zinc-700">Items per page:</label>
-                        <select
-                          value={itemsPerPage}
-                          onChange={(e) => {
-                            setItemsPerPage(Number(e.target.value));
-                            setCurrentPage(1);
+              <div className="flex items-center gap-1">
+                <span className="text-zinc-700 font-medium">SV</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="Min"
+                  value={svMinInput}
+                  onChange={(e) => setSvMinInput(e.target.value)}
+                  className="w-16 px-2 py-1 border border-zinc-300 rounded-md bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                />
+                <span className="text-zinc-500">–</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="Max"
+                  value={svMaxInput}
+                  onChange={(e) => setSvMaxInput(e.target.value)}
+                  className="w-16 px-2 py-1 border border-zinc-300 rounded-md bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-zinc-700 font-medium">Intent</span>
+                <div className="flex flex-wrap gap-2">
+                  {intentOptions.map((intent) => {
+                    const checked = selectedIntentsInput.includes(intent);
+                    return (
+                      <label
+                        key={intent}
+                        className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2 py-0.5 cursor-pointer hover:bg-zinc-100"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-3 w-3 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                          checked={checked}
+                          onChange={() => {
+                            setSelectedIntentsInput((prev) =>
+                              prev.includes(intent)
+                                ? prev.filter((value) => value !== intent)
+                                : [...prev, intent],
+                            );
                           }}
-                          className="px-2 py-1 border border-zinc-300 rounded-md bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                        >
-                          <option value={10}>10</option>
-                          <option value={25}>25</option>
-                          <option value={50}>50</option>
-                          <option value={100}>100</option>
-                        </select>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                          disabled={currentPage === 1}
-                          className="px-3 py-1 border border-zinc-300 rounded-md bg-white text-zinc-900
-                            hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed
-                            transition-colors"
-                        >
-                          Previous
-                        </button>
-                        <span className="text-sm text-zinc-700">
-                          Page {currentPage} of {totalPages}
-                        </span>
-                        <button
-                          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                          disabled={currentPage === totalPages}
-                          className="px-3 py-1 border border-zinc-300 rounded-md bg-white text-zinc-900
-                            hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed
-                            transition-colors"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                        />
+                        <span className="text-[11px] sm:text-xs text-zinc-800">{intent}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
-            ) : (
-              <div className="text-center py-12 text-zinc-500">
-                <p>Select a keyword from the left panel to view its change history</p>
+
+         
+
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2 py-1 cursor-pointer hover:bg-zinc-100">
+                  <input
+                    type="checkbox"
+                    className="h-3 w-3 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                    checked={hasChangesInput}
+                    onChange={(e) => setHasChangesInput(e.target.checked)}
+                  />
+                  <span className="text-xs text-zinc-800">Has Changes in KD or SV</span>
+                </label>
               </div>
-            )}
+
+              <div className="flex flex-wrap items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKdMinInput('');
+                    setKdMaxInput('');
+                    setSvMinInput('');
+                    setSvMaxInput('');
+                    setSelectedIntentsInput([]);
+                    setSelectedDataSourceInput('all');
+                    setHasChangesInput(false);
+                    setKdMinFilter('');
+                    setKdMaxFilter('');
+                    setSvMinFilter('');
+                    setSvMaxFilter('');
+                    setSelectedIntentsFilter([]);
+                    setSelectedDataSourceFilter('all');
+                    setHasChangesFilter(false);
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 rounded-md border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKdMinFilter(kdMinInput);
+                    setKdMaxFilter(kdMaxInput);
+                    setSvMinFilter(svMinInput);
+                    setSvMaxFilter(svMaxInput);
+                    setSelectedIntentsFilter(selectedIntentsInput);
+                    setSelectedDataSourceFilter(selectedDataSourceInput);
+                    setHasChangesFilter(hasChangesInput);
+                    setCurrentPage(1);
+                  }}
+                  className="px-3 py-1 rounded-md bg-zinc-900 text-white hover:bg-zinc-800"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Matrix Table */}
+        <div className="bg-white rounded-lg border border-zinc-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 400px)', overflowY: 'auto' }}>
+            <table className="border-collapse" style={{ width: 'max-content', minWidth: '100%', tableLayout: 'auto' }}>
+              <thead>
+                <tr className="bg-zinc-50 border-b-2 border-zinc-200" style={{ position: 'sticky', top: 0, zIndex: 15 }}>
+                  {/* Keyword column header */}
+                  <th
+                    rowSpan={2}
+                    onClick={() => handleSort('keyword')}
+                    className="px-4 py-3 text-left text-sm font-semibold text-zinc-800
+                      cursor-pointer hover:bg-zinc-100 select-none border-r-2 border-zinc-200
+                      bg-zinc-50"
+                    style={{ 
+                      minWidth: '200px',
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 30,
+                      backgroundColor: '#fafafa'
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      Keyword
+                      {getSortIcon('keyword')}
+                    </div>
+                  </th>
+                  {/* Date column headers with sub-columns */}
+                  {matrixData.dates.map((date) => (
+                    <th
+                      key={date}
+                      colSpan={4}
+                      className="px-2 py-3 text-center text-xs font-semibold text-zinc-800 border-r border-zinc-200"
+                      style={{ minWidth: '320px' }}
+                    >
+                      <div className="font-semibold">{date}</div>
+                    </th>
+                  ))}
+                </tr>
+                <tr className="bg-zinc-50 border-b border-zinc-200">
+                  {/* Note: No empty cell needed here because keyword column has rowSpan={2} */}
+                  {/* Sub-column headers for each date */}
+                  {matrixData.dates.flatMap((date) => [
+                    <th 
+                      key={`${date}-kd`} 
+                      onClick={() => handleSort(`${date}||kd`)}
+                      className="px-2 py-2 text-xs font-medium text-zinc-700 border-r border-zinc-100
+                        cursor-pointer hover:bg-zinc-100 select-none"
+                      style={{ width: '80px', minWidth: '80px' }}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        KD
+                        {getSortIcon(`${date}||kd`)}
+                      </div>
+                    </th>,
+                    <th 
+                      key={`${date}-sv`} 
+                      onClick={() => handleSort(`${date}||sv`)}
+                      className="px-2 py-2 text-xs font-medium text-zinc-700 border-r border-zinc-100
+                        cursor-pointer hover:bg-zinc-100 select-none"
+                      style={{ width: '80px', minWidth: '80px' }}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        SV
+                        {getSortIcon(`${date}||sv`)}
+                      </div>
+                    </th>,
+                    <th 
+                      key={`${date}-intent`} 
+                      onClick={() => handleSort(`${date}||intent`)}
+                      className="px-2 py-2 text-xs font-medium text-zinc-700 border-r border-zinc-100
+                        cursor-pointer hover:bg-zinc-100 select-none"
+                      style={{ width: '80px', minWidth: '80px' }}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        Intent
+                        {getSortIcon(`${date}||intent`)}
+                      </div>
+                    </th>,
+                    <th 
+                      key={`${date}-source`} 
+                      onClick={() => handleSort(`${date}||source`)}
+                      className="px-2 py-2 text-xs font-medium text-zinc-700 border-r border-zinc-200
+                        cursor-pointer hover:bg-zinc-100 select-none"
+                      style={{ width: '80px', minWidth: '80px' }}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        Present In
+                        {getSortIcon(`${date}||source`)}
+                      </div>
+                    </th>,
+                  ])}
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedKeywords.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={1 + matrixData.dates.length * 4}
+                      className="px-4 py-8 text-center text-zinc-700"
+                    >
+                      {searchQuery ? 'No keywords found matching your search' : 'No keywords available'}
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedKeywords.map((keyword) => {
+                    const keywordMap = matrixData.matrix.get(keyword);
+                    return (
+                      <tr
+                        key={keyword}
+                        className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors"
+                      >
+                        {/* Keyword name (sticky) */}
+                        <td 
+                          className="px-4 py-3 text-sm font-medium text-zinc-900 border-r-2 border-zinc-200 bg-white"
+                          style={{
+                            position: 'sticky',
+                            left: 0,
+                            zIndex: 20,
+                            backgroundColor: '#ffffff'
+                          }}
+                        >
+                          {keyword}
+                        </td>
+                        {/* Data cells for each date */}
+                        {matrixData.dates.flatMap((date) => {
+                          const cell = keywordMap?.get(date);
+                          if (!cell) {
+                            return [
+                              <td key={`${keyword}-${date}-kd`} className="px-2 py-3 text-sm text-zinc-400 text-center border-r border-zinc-100" style={{ width: '80px', minWidth: '80px' }}>-</td>,
+                              <td key={`${keyword}-${date}-sv`} className="px-2 py-3 text-sm text-zinc-400 text-center border-r border-zinc-100" style={{ width: '80px', minWidth: '80px' }}>-</td>,
+                              <td key={`${keyword}-${date}-intent`} className="px-2 py-3 text-sm text-zinc-400 text-center border-r border-zinc-100" style={{ width: '80px', minWidth: '80px' }}>-</td>,
+                              <td key={`${keyword}-${date}-source`} className="px-2 py-3 text-sm text-zinc-400 text-center border-r border-zinc-200" style={{ width: '80px', minWidth: '80px' }}>-</td>,
+                            ];
+                          }
+                          return [
+                            <td key={`${keyword}-${date}-kd`} className="px-2 py-3 text-sm text-zinc-900 text-center border-r border-zinc-100" style={{ width: '80px', minWidth: '80px' }}>
+                              {cell.kd}
+                            </td>,
+                            <td key={`${keyword}-${date}-sv`} className="px-2 py-3 text-sm text-zinc-900 text-center border-r border-zinc-100" style={{ width: '80px', minWidth: '80px' }}>
+                              {cell.sv}
+                            </td>,
+                            <td key={`${keyword}-${date}-intent`} className="px-2 py-3 text-sm text-zinc-900 text-center border-r border-zinc-100" style={{ width: '80px', minWidth: '80px' }}>
+                              {cell.intent}
+                            </td>,
+                            <td key={`${keyword}-${date}-source`} className="px-2 py-3 text-sm text-zinc-600 text-center border-r border-zinc-200" style={{ width: '80px', minWidth: '80px' }} title={cell.dataSources.join(', ')}>
+                              {cell.dataSources.length > 0 ? (
+                                <span className="max-w-xs truncate inline-block">
+                                  {cell.dataSources.join(', ')}
+                                </span>
+                              ) : (
+                                '-'
+                              )}
+                            </td>,
+                          ];
+                        })}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-zinc-700">Items per page:</label>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 border border-zinc-300 rounded-md bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-500"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border border-zinc-300 rounded-md bg-white text-zinc-900
+                  hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed
+                  transition-colors"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-zinc-700">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 border border-zinc-300 rounded-md bg-white text-zinc-900
+                  hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed
+                  transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
-  );
-}
-
-export default function ReportPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-zinc-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center py-8 text-zinc-700">Loading report data...</div>
-        </div>
-      </div>
-    }>
-      <ReportContent />
-    </Suspense>
   );
 }

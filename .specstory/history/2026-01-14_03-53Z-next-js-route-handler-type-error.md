@@ -782,3 +782,872 @@ The codebase is ready for deployment. All TypeScript errors that would block the
 
 ---
 
+_**User (2026-01-14 03:53Z)**_
+
+Another issue found:
+12:17:39.500 Running build in Washington, D.C., USA (East) – iad1
+12:17:39.501 Build machine configuration: 2 cores, 8 GB
+12:17:39.630 Cloning github.com/afajohn/cenix-keyword-manager (Branch: main, Commit: 0643755)
+12:17:39.631 Previous build caches not available.
+12:17:39.863 Cloning completed: 233.000ms
+12:17:40.253 Running "vercel build"
+12:17:40.669 Vercel CLI 50.1.6
+12:17:40.980 Installing dependencies...
+12:17:58.292 
+12:17:58.293 added 444 packages in 17s
+12:17:58.294 
+12:17:58.294 147 packages are looking for funding
+12:17:58.294   run `npm fund` for details
+12:17:58.467 Detected Next.js version: 16.1.1
+12:17:58.474 Running "npm run build"
+12:17:58.595 
+12:17:58.596 > kwmaster@0.1.0 build
+12:17:58.596 > next build
+12:17:58.596 
+12:17:59.404 Attention: Next.js now collects completely anonymous telemetry regarding usage.
+12:17:59.405 This information is used to shape Next.js' roadmap and prioritize features.
+12:17:59.405 You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+12:17:59.405 https://nextjs.org/telemetry
+12:17:59.405 
+12:17:59.419 ▲ Next.js 16.1.1 (Turbopack)
+12:17:59.420 
+12:17:59.451   Creating an optimized production build ...
+12:18:06.242 ✓ Compiled successfully in 6.3s
+12:18:06.246   Running TypeScript ...
+12:18:09.808   Collecting page data using 1 worker ...
+12:18:10.220   Generating static pages using 1 worker (0/7) ...
+12:18:10.233   Generating static pages using 1 worker (1/7) 
+12:18:10.322 ⨯ useSearchParams() should be wrapped in a suspense boundary at page "/report". Read more: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+12:18:10.322     at Q (/vercel/path0/.next/server/chunks/ssr/node_modules_next_920e7746._.js:2:2111)
+12:18:10.322     at o (/vercel/path0/.next/server/chunks/ssr/node_modules_next_920e7746._.js:4:5284)
+12:18:10.322     at g (/vercel/path0/.next/server/chunks/ssr/app_report_page_tsx_1d1a5494._.js:1:402)
+12:18:10.322     at an (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:84360)
+12:18:10.322     at ai (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:86179)
+12:18:10.323     at al (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:107953)
+12:18:10.323     at as (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:105368)
+12:18:10.323     at aa (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:84712)
+12:18:10.323     at ai (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:86228)
+12:18:10.323     at ai (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:104708)
+12:18:10.323 Error occurred prerendering page "/report". Read more: https://nextjs.org/docs/messages/prerender-error
+12:18:10.324 Export encountered an error on /report/page: /report, exiting the build.
+12:18:10.335 ⨯ Next.js build worker exited with code: 1 and signal: null
+12:18:10.369 Error: Command "npm run build" exited with 1
+
+---
+
+_**Agent (model default, mode Agent)**_
+
+
+
+---
+
+The error is that `useSearchParams()` must be wrapped in a Suspense boundary. Checking the report page:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+Wrapping the component that uses `useSearchParams()` in a Suspense boundary. Extracting the logic into a separate component and wrapping it:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: app/report/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1,5 +1,5 @@
+  'use client';
+  
+- import { useState, useEffect, useMemo } from 'react';
++ import { useState, useEffect, useMemo, Suspense } from 'react';
+  import { useSearchParams } from 'next/navigation';
+  import Link from 'next/link';
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: app/report/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -75,5 +75,5 @@
+  };
+  
+- export default function ReportPage() {
++ function ReportContent() {
+    const searchParams = useSearchParams();
+    const dataSourceParam = searchParams.get('dataSource');
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+Adding the default export that wraps the component in Suspense:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: app/report/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 14, lines removed: 1
+
+```diff
+@@ -936,4 +937,17 @@
+    );
+  }
+- }
++ 
++ export default function ReportPage() {
++   return (
++     &lt;Suspense fallback={
++       &lt;div className="min-h-screen bg-zinc-50 p-6"&gt;
++         &lt;div className="max-w-7xl mx-auto"&gt;
++           &lt;div className="text-center py-8 text-zinc-700"&gt;Loading report data...&lt;/div&gt;
++         &lt;/div&gt;
++       &lt;/div&gt;
++     }&gt;
++       &lt;ReportContent /&gt;
++     &lt;/Suspense&gt;
++   );
++ }
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `app/report/page.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: npx tsc --noEmit</summary>
+
+```bash
+npx tsc --noEmit
+```
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+Checking for other uses of `useSearchParams()` that need the same fix:
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "useSearchParams" in "app" • 2 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `app\report\page.tsx` | `import \{ useSearchParams \} from 'next/navigation';` | L4 |
+| `app\report\page.tsx` | `const searchParams = useSearchParams();` | L78 |
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+---
+
+Fix complete. Verifying the final state:
+
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+Result:
+
+```json
+{
+  "path": "all files"
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "export default function" in "app/report/page.tsx" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `app/report/page.tsx` | `export default function ReportPage() \{` | L940 |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+## Fixed: Suspense boundary for `useSearchParams()`
+
+### Changes made
+
+1. Added Suspense import: Added `Suspense` to the React imports.
+2. Extracted component: Renamed the main component from `ReportPage` to `ReportContent` (contains the `useSearchParams()` logic).
+3. Wrapped with Suspense: Created a new default export `ReportPage` that wraps `ReportContent` in a `<Suspense>` boundary with a loading fallback.
+
+### What this fixes
+
+Next.js 15+ requires `useSearchParams()` to be wrapped in a Suspense boundary because it can cause the page to opt out of static generation. The error was:
+```
+⨯ useSearchParams() should be wrapped in a suspense boundary at page "/report"
+```
+
+### Verification
+
+- TypeScript compilation: No errors
+- Linting: No errors
+- Structure: Component properly wrapped in Suspense
+
+The build should now succeed on Vercel. The Suspense boundary ensures the page can be statically generated while still supporting dynamic search params.
+
+---
+
+_**User (2026-01-15 00:40Z)**_
+
+@powershell (977-1012) 
+
+---
+
+_**Agent (model default, mode Agent)**_
+
+
+
+---
+
+
+Resolving `tailwindcss` from the wrong directory. Checking TailwindCSS configuration and dependencies:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: package.json</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: postcss.config.mjs</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "tailwind.config.*" • **0** result in **1** directory</summary>
+
+Directory: **c:\Users\AM_SHIFT\Documents\WebApps\pr-kwmaster\cenix-keyword-manager** (0 file)
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/globals.css</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Tailwind CSS v4 is installed, but the build is resolving from the wrong directory. Checking configuration and ensuring the setup is correct:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: next.config.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir">
+<details>
+            <summary>Tool use: **list_dir** • Listed directory, 0 results</summary>
+        
+No results found
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: npm list tailwindcss</summary>
+
+```bash
+npm list tailwindcss
+```
+
+```
+kwmaster@0.1.0 C:\Users\AM_SHIFT\Documents\WebApps\pr-kwmaster\cenix-keyword-manager
++-- @tailwindcss/postcss@4.1.18
+| +-- @tailwindcss/node@4.1.18
+| | &#96;-- tailwindcss@4.1.18 deduped
+| &#96;-- tailwindcss@4.1.18 deduped
+&#96;-- tailwindcss@4.1.18
+
+
+```
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Resolving `tailwindcss` from the parent directory. With Tailwind CSS v4, the PostCSS plugin should handle it. Checking if we need a Tailwind config file and verifying the setup:
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="codebase_search">
+<details>
+                <summary>Tool use: **codebase_search** • Searched codebase "Where is tailwindcss imported or required as a module in JavaScript or TypeScript files?" • **15** results</summary>
+            
+| File | Lines |
+|------|-------|
+| `package.json` | L29 |
+| `postcss.config.mjs` | L6 |
+| `tsconfig.json` | L34 |
+| `app/globals.css` | L19 |
+| `app/layout.tsx` | L33 |
+| `app/layout.tsx` | L14-33 |
+| `app/page.tsx` | L51 |
+| `eslint.config.mjs` | L17 |
+| `README.md` | L222-246 |
+| `RESTORE_POINT.md` | L420-491 |
+| `next.config.ts` | L6 |
+| `RESTORE_POINT.md` | L58 |
+| `components/WebsiteNavigation.tsx` | L63 |
+| `README.md` | L47-117 |
+| `lib/firebase.ts` | L23 |
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "require.*tailwind|import.*tailwind|from.*tailwind" in "." • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.\app\globals.css` | `@import "tailwindcss";` | L1 |
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/globals.css</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Resolving `tailwindcss` from the wrong directory. With Tailwind CSS v4, the PostCSS plugin should handle the import. Checking if we need to update the Next.js configuration or adjust how Tailwind is imported. Verifying the build works locally:
+
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: npm run build</summary>
+
+```bash
+npm run build
+```
+
+```
+
+&gt; kwmaster@0.1.0 build
+&gt; next build
+
+▲ Next.js 16.1.1 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.1s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/7) ...
+  Generating static pages using 7 workers (1/7) 
+  Generating static pages using 7 workers (3/7) 
+  Generating static pages using 7 workers (5/7) 
+✓ Generating static pages using 7 workers (7/7) in 166.7ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/records
+├ ƒ /api/records/[id]
+├ ƒ /api/upload-csv
+├ ○ /report
+└ ƒ /website/[websiteName]
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+```
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Local build succeeds. The error suggests resolving from the wrong directory (`pr-kwmaster` instead of `cenix-keyword-manager`), likely due to the build running from the parent directory. Verifying the setup and checking if there's a workspace configuration:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: package.json</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir">
+<details>
+            <summary>Tool use: **list_dir** • Listed directory, 0 results</summary>
+        
+No results found
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "package.json" • **1** result in **1** directory</summary>
+
+Directory: **c:\Users\AM_SHIFT\Documents\WebApps\pr-kwmaster** (1 file)
+
+| File |
+|------|
+| `cenix-keyword-manager\package.json` |
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Local build succeeds. The error likely comes from running the build from the wrong directory. Verifying configuration and preparing a brief guide:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: postcss.config.mjs</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "vercel.json" • **0** result in **1** directory</summary>
+
+Directory: **c:\Users\AM_SHIFT\Documents\WebApps\pr-kwmaster\cenix-keyword-manager** (0 file)
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: next.config.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Configuration looks correct. The error occurs when the build runs from the parent directory instead of the project directory.
+
+## Summary
+
+- Local build works (verified)
+- Tailwind CSS v4 is set up correctly
+- Dependencies are installed
+
+## The Error
+
+The error shows it's trying to resolve `tailwindcss` from:
+- `C:\Users\AM_SHIFT\Documents\WebApps\pr-kwmaster` (parent directory)
+
+Instead of:
+- `C:\Users\AM_SHIFT\Documents\WebApps\pr-kwmaster\cenix-keyword-manager` (project directory)
+
+## Solution
+
+Ensure builds run from the project root:
+
+1. For local builds:
+   ```powershell
+   cd C:\Users\AM_SHIFT\Documents\WebApps\pr-kwmaster\cenix-keyword-manager
+   npm run build
+   ```
+
+2. For Vercel:
+   - In Vercel Project Settings → General → Root Directory, ensure it's set to `cenix-keyword-manager` (if the repo root is `pr-kwmaster`) or leave it empty if the repo root is already `cenix-keyword-manager`.
+
+## Verification
+
+- Configuration files are correct
+- Dependencies are installed
+- Local build succeeds
+
+The issue is likely the working directory. Always run commands from the `cenix-keyword-manager` directory, not the parent `pr-kwmaster` directory.
+
+Is this error occurring locally, on Vercel, or in your IDE? That will help narrow it down further.
+
+---
+
+_**User (2026-01-15 00:40Z)**_
+
+I want to run the project locally
+
+---
+
+_**Agent (model default, mode Agent)**_
+
+
+
+---
+
+
+Checking the setup and starting the local dev server:
+
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: npm install</summary>
+
+```bash
+npm install
+```
+
+```
+
+up to date, audited 438 packages in 907ms
+
+143 packages are looking for funding
+  run &#96;npm fund&#96; for details
+
+found 0 vulnerabilities
+
+```
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase ".env*" • **1** result in **1** directory</summary>
+
+Directory: **c:\Users\AM_SHIFT\Documents\WebApps\pr-kwmaster\cenix-keyword-manager** (1 file)
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking for environment variables and starting the development server:
+
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: if (Test-Path .env.local) { Write-Host "Found .env.local file" } else { Write-Host ".env.local file not found - you may need to create it with Firebase config" }</summary>
+
+```bash
+if (Test-Path .env.local) { Write-Host "Found .env.local file" } else { Write-Host ".env.local file not found - you may need to create it with Firebase config" }
+```
+
+```
+Found .env.local file
+
+```
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: lib/firebase.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: README.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Starting the development server:
+
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: npm run dev</summary>
+
+```bash
+npm run dev
+```
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Waiting a few seconds, then checking if the server started:
+
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: Start-Sleep -Seconds 5; Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -First 1</summary>
+
+```bash
+Start-Sleep -Seconds 5; Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -First 1
+```
+
+```
+
+LocalAddress                        LocalPort RemoteAddress                       RemotePort State       AppliedSetting
+------------                        --------- -------------                       ---------- -----       --------------
+::1                                 3000      ::1                                 65282      TimeWait                  
+
+```
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+## Project is running locally
+
+### Access the application
+
+Open your browser and go to:
+```
+http://localhost:3000
+```
+
+### Development server status
+
+- Dependencies installed (438 packages)
+- Environment variables configured (.env.local found)
+- Development server started on port 3000
+
+### Available pages
+
+- Main Dashboard: `http://localhost:3000`
+  - Upload CSV files
+  - Manage keyword records
+  - Filter and search data
+
+- Keyword Report: `http://localhost:3000/report`
+  - Track keyword changes over time
+  - Compare metrics across dates
+
+- Website Pages: `http://localhost:3000/website/[websiteName]`
+  - View keywords assigned to specific websites
+
+### Useful commands
+
+- Stop the server: Press `Ctrl + C` in the terminal
+- Restart: Run `npm run dev` again
+- Build for production: `npm run build`
+- Start production server: `npm run start`
+
+### Troubleshooting
+
+- If port 3000 is in use, Next.js will use the next available port (e.g., 3001)
+- Check the terminal output for the exact URL
+- Ensure your Firebase environment variables in `.env.local` are correct
+
+The development server includes hot reloading, so changes to your code will refresh automatically.
+
+---
+
