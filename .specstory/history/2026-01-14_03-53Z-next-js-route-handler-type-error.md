@@ -2235,3 +2235,387 @@ The Suspense boundary allows the page to be statically generated while still sup
 
 ---
 
+_**User (2026-01-16 10:04Z)**_
+
+18:31:54.179 Running build in Washington, D.C., USA (East) – iad1
+18:31:54.180 Build machine configuration: 2 cores, 8 GB
+18:31:54.312 Cloning github.com/afajohn/cenix-keyword-manager (Branch: main, Commit: 6d2082e)
+18:31:54.635 Cloning completed: 323.000ms
+18:31:55.483 Restored build cache from previous deployment (EnCtpJqHxSWiCMKPyd1xqTyFj8Kz)
+18:31:56.943 Running "vercel build"
+18:31:58.044 Vercel CLI 50.4.3
+18:31:58.347 Installing dependencies...
+18:31:59.528 
+18:31:59.530 up to date in 976ms
+18:31:59.531 
+18:31:59.531 147 packages are looking for funding
+18:31:59.531   run `npm fund` for details
+18:31:59.557 Detected Next.js version: 16.1.1
+18:31:59.562 Running "npm run build"
+18:31:59.663 
+18:31:59.664 > kwmaster@0.1.0 build
+18:31:59.664 > next build
+18:31:59.664 
+18:32:00.656 ▲ Next.js 16.1.1 (Turbopack)
+18:32:00.657 
+18:32:00.690   Creating an optimized production build ...
+18:32:08.795 ✓ Compiled successfully in 7.6s
+18:32:08.802   Running TypeScript ...
+18:32:13.180 Failed to compile.
+18:32:13.180 
+18:32:13.181 Type error: Type 'typeof import("/vercel/path0/app/api/upload-csv/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/upload-csv">'.
+18:32:13.181   The types returned by 'POST(...)' are incompatible between these types.
+18:32:13.181     Type 'Promise<unknown>' is not assignable to type 'void | Response | Promise<void | Response>'.
+18:32:13.181       Type 'Promise<unknown>' is not assignable to type 'Promise<void | Response>'.
+18:32:13.181         Type 'unknown' is not assignable to type 'void | Response'.
+18:32:13.181 
+18:32:13.217 Next.js build worker exited with code: 1 and signal: null
+18:32:13.287 Error: Command "npm run build" exited with 1
+
+---
+
+_**Agent (model default, mode Agent)**_
+
+
+
+---
+
+
+Checking the upload-csv route file for the TypeScript error:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/api/upload-csv/route.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+The file is missing the fixes again. Reapplying them:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: app/api/upload-csv/route.ts</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -27,5 +27,5 @@
+      const text = await file.text();
+  
+-     return new Promise((resolve) =&gt; {
++     return new Promise&lt;NextResponse&gt;((resolve) =&gt; {
+        Papa.parse(text, {
+          header: true,
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: app/api/upload-csv/route.ts</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -46,5 +46,5 @@
+  
+              // Store only the parsed data records in Firestore (not the CSV file)
+-             const batch: Promise&lt;void&gt;[] = [];
++             const batch: Promise&lt;unknown&gt;[] = [];
+  
+              for (let i = 0; i &lt; data.length; i++) {
+```
+
+**Chunk 2**
+Lines added: 2, lines removed: 1
+
+```diff
+@@ -65,6 +65,7 @@
+                      dataSource: dataSource.trim(),
+                      createdAt: new Date().toISOString(),
+-                   }).catch((error) =&gt; {
++                   }).catch((error: any) =&gt; {
+                      errors.push(&#96;Row ${i + 1}: ${error.message}&#96;);
++                     return undefined;
+                    })
+                  );
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: app/api/upload-csv/route.ts</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -107,5 +107,5 @@
+            }
+          },
+-         error: (error) =&gt; {
++         error: (error: Error) =&gt; {
+            resolve(
+              NextResponse.json(
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `app/api/upload-csv/route.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: npx tsc --noEmit</summary>
+
+```bash
+npx tsc --noEmit
+```
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Verifying the fixes are complete:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/api/upload-csv/route.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/api/upload-csv/route.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/api/upload-csv/route.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/api/upload-csv/route.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+All fixes are applied. Summary:
+
+## Fixed TypeScript errors in `app/api/upload-csv/route.ts`
+
+### Changes applied
+
+1. Line 29: Added explicit Promise type
+   - Changed: `new Promise((resolve) => {`
+   - To: `new Promise<NextResponse>((resolve) => {`
+
+2. Line 48: Fixed batch array type
+   - Changed: `const batch: Promise<void>[] = [];`
+   - To: `const batch: Promise<unknown>[] = [];`
+
+3. Lines 67-69: Fixed error handler in catch
+   - Added type annotation: `(error: any) => {`
+   - Added return: `return undefined;`
+
+4. Line 109: Fixed Papa.parse error callback type
+   - Changed: `error: (error) => {`
+   - To: `error: (error: Error) => {`
+
+### Verification
+
+- TypeScript compilation: Passed (no errors)
+- Linting: No errors
+- All type issues resolved
+
+## Ready to deploy
+
+The upload-csv route now has the correct TypeScript types. Commit and push these changes, then redeploy on Vercel. The build should succeed.
+
+Note: If you reverted the Suspense changes to the report page, you may see that error again. If it appears, I can help fix it again.
+
+---
+
+_**User (2026-01-16 10:04Z)**_
+
+18:34:46.022 Running build in Washington, D.C., USA (East) – iad1
+18:34:46.023 Build machine configuration: 2 cores, 8 GB
+18:34:46.166 Cloning github.com/afajohn/cenix-keyword-manager (Branch: main, Commit: 5fd9354)
+18:34:46.497 Cloning completed: 331.000ms
+18:34:47.358 Restored build cache from previous deployment (EnCtpJqHxSWiCMKPyd1xqTyFj8Kz)
+18:34:47.828 Running "vercel build"
+18:34:49.118 Vercel CLI 50.4.3
+18:34:49.403 Installing dependencies...
+18:34:51.062 
+18:34:51.063 up to date in 1s
+18:34:51.063 
+18:34:51.064 147 packages are looking for funding
+18:34:51.064   run `npm fund` for details
+18:34:51.089 Detected Next.js version: 16.1.1
+18:34:51.093 Running "npm run build"
+18:34:51.199 
+18:34:51.200 > kwmaster@0.1.0 build
+18:34:51.200 > next build
+18:34:51.200 
+18:34:52.230 ▲ Next.js 16.1.1 (Turbopack)
+18:34:52.231 
+18:34:52.264   Creating an optimized production build ...
+18:35:00.281 ✓ Compiled successfully in 7.5s
+18:35:00.284   Running TypeScript ...
+18:35:04.556   Collecting page data using 1 worker ...
+18:35:04.975   Generating static pages using 1 worker (0/8) ...
+18:35:04.994   Generating static pages using 1 worker (2/8) 
+18:35:05.107 ⨯ useSearchParams() should be wrapped in a suspense boundary at page "/report". Read more: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+18:35:05.108     at Q (/vercel/path0/.next/server/chunks/ssr/node_modules_next_920e7746._.js:2:2111)
+18:35:05.108     at o (/vercel/path0/.next/server/chunks/ssr/node_modules_next_920e7746._.js:4:5284)
+18:35:05.108     at j (/vercel/path0/.next/server/chunks/ssr/app_report_page_tsx_1d1a5494._.js:1:661)
+18:35:05.108     at an (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:84360)
+18:35:05.108     at ai (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:86179)
+18:35:05.109     at al (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:107953)
+18:35:05.109     at as (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:105368)
+18:35:05.109     at aa (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:84712)
+18:35:05.109     at ai (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:86228)
+18:35:05.109     at ai (/vercel/path0/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:104708)
+18:35:05.110 Error occurred prerendering page "/report". Read more: https://nextjs.org/docs/messages/prerender-error
+18:35:05.110 Export encountered an error on /report/page: /report, exiting the build.
+18:35:05.124 ⨯ Next.js build worker exited with code: 1 and signal: null
+18:35:05.160 Error: Command "npm run build" exited with 1
+
+---
+
+_**Agent (model default, mode Agent)**_
+
+
+
+---
+
+
+Checking the report page and adding the Suspense boundary:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "export default|useSearchParams" in "app/report/page.tsx" • 3 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `app/report/page.tsx` | `import \{ useSearchParams \} from 'next/navigation';` | L4 |
+| `app/report/page.tsx` | `export default function ReportPage() \{` | L90 |
+| `app/report/page.tsx` | `const searchParams = useSearchParams();` | L91 |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Adding the Suspense wrapper. Checking the end of the file:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/report/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: app/report/page.tsx</summary>
+
+Status: **loading**
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
